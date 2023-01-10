@@ -6,9 +6,32 @@ import { GetServerSideProps, InferGetServerSidePropsType, NextPage } from "next"
 import getBlogs from "../server/blogs";
 import { BlogPost } from "../interfaces/blog";
 import PostPreview from "../components/PostPreview";
+import { useEffect, useMemo, useState } from "react";
 
-export default function Home({blogs} : InferGetServerSidePropsType<typeof getServerSideProps>) {
-  console.log(blogs)
+export default function Home({blogs, tagsFilter} : InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const [selectedTags, setSelectedTags] = useState<number[]>([])
+  const [filterWords, setFilterWords] = useState<string[]>([])
+  const selectTagHandle =(e: EventTarget, index: number)=>{
+    if(selectedTags.indexOf(index)< 0) {
+      setSelectedTags([...selectedTags, index])
+      setFilterWords([...filterWords, e.innerText])
+    }
+    else {
+      setSelectedTags(selectedTags.filter(slecTag => slecTag != index ))
+      setFilterWords(filterWords.filter(slecWord => slecWord != e.innerText ))
+    }
+  }
+  const filterBlogs: BlogPost[] = useMemo(()=>{
+    console.log(filterWords)
+    if(filterWords.length<=0) return blogs
+
+    return blogs.filter((blog: BlogPost) =>{
+      return filterWords.every((word)=> blog.tags.indexOf(word) >= 0)
+    })
+  },[filterWords])
+  useEffect(()=>{
+    console.log(filterBlogs)
+  },[filterWords])
   return (
     <>
       <Head>
@@ -26,11 +49,18 @@ export default function Home({blogs} : InferGetServerSidePropsType<typeof getSer
           </div>
         </section>
         <section className="flex flex-col items-center justify-center text-[1.15rem] mt-12">
-          <div className="flex gap-3 mb-12"></div>
-            {blogs.map((blog: BlogPost)=>{
+          <div className="flex gap-3 mb-12">
+            {tagsFilter.map((tag: string, i: number)=>{
+              return(
+                <div key={i} className="rounded-lg bg-[#3f15fa] text-[#000] font-semibold hover:text-[#fff] hover:bg-[#47a1f7] px-2 cursor-pointer"  
+                onClick={(e)=>selectTagHandle(e.target, i) }>{tag}</div>
+              )
+            })}
+          </div>
+            {filterBlogs.map((blog: BlogPost)=>{
               return(
                 <div key={blog.id} className="max-w-[28em] w-full max-h-[20em] overflow-hidden mx-6 mb-6 bg-neutral-300 text-zinc-800 rounded-lg p-4 hover:text-neutral-300 hover:bg-neutral-500 transition-all duration-300 cursor-pointer">
-                <PostPreview id={blog.id} title={blog.title} bodyText={blog.bodyText} createdAt={blog.createdAt} author={blog.author} tags={blog.tags} />
+                  <PostPreview id={blog.id} title={blog.title} bodyText={blog.bodyText} createdAt={blog.createdAt} author={blog.author} tags={blog.tags} />
                 </div>
               )
             })}
@@ -43,9 +73,15 @@ export default function Home({blogs} : InferGetServerSidePropsType<typeof getSer
 
 export const getServerSideProps: GetServerSideProps = async ()=>{
   let blogs: BlogPost[] = await getBlogs()
+  let tagsFilter: string[] = await blogs.reduce((tagArray: string[], blog: BlogPost )=>{
+      blog.tags.forEach((tag: string)=>{
+        if(tagArray.indexOf(tag) < 0) tagArray.push(tag)
+      })
+     return tagArray
+  }, [])
   return {
     props:{
-      blogs
+      blogs, tagsFilter
     }
   }
 }
